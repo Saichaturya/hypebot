@@ -1,58 +1,40 @@
 import streamlit as st
-from openai import OpenAI
-import os
+from transformers import pipeline
+from PIL import Image
 
-# Load OpenAI API key
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Load a text generation pipeline (using a lightweight model)
+generator = pipeline("text-generation", model="distilgpt2")
 
-st.set_page_config(page_title="🚀 HypeBot: AI-Powered Startup Hype Generator")
+st.set_page_config(page_title="🚀 HypeBot: Startup Hype Generator", layout="centered")
 st.title("🚀 HypeBot: AI-Powered Startup Hype Generator")
-st.caption("Generate killer startup pitches, taglines, social media posts, and more!")
 
-# Upload Logo/Image (optional)
-uploaded_file = st.file_uploader(
-    "Upload a logo or image (optional)", type=["png", "jpg", "jpeg"]
-)
+st.markdown("Generate killer startup pitches, taglines, social media posts, and more!")
 
-# Form Inputs
+# Image uploader
+uploaded_image = st.file_uploader("Upload a logo or image (optional)", type=["png", "jpg", "jpeg"])
+
+if uploaded_image:
+    st.image(Image.open(uploaded_image), use_column_width=True)
+
+# User inputs
 startup_name = st.text_input("Startup Name")
 description = st.text_area("Brief Description of Your Startup")
-target_audience = st.text_input("Target Audience")
-content_type = st.selectbox("Content Type", ["Elevator Pitch", "Tagline", "Tweet", "Ad Copy"])
-tone = st.selectbox("Tone", ["Professional", "Casual", "Funny", "Inspirational"])
-variations = st.slider("Number of Variations", min_value=1, max_value=5, value=1)
+audience = st.text_input("Target Audience", value="General Public")
 
-# Prompt builder
-def generate_prompt(name, desc, audience, ctype, tone):
-    return f"""
-Generate a {ctype.lower()} for a startup.
-Startup Name: {name}
-Description: {desc}
-Target Audience: {audience}
-Tone: {tone}
-Provide only the output text.
-"""
+content_type = st.selectbox("Content Type", ["Elevator Pitch", "Tagline", "Social Media Post"])
+tone = st.selectbox("Tone", ["Professional", "Friendly", "Funny", "Bold"])
+num_variations = st.slider("Number of Variations", 1, 5, 1)
 
-# Submit Button
+# Generate button
 if st.button("Generate"):
-    if not (startup_name and description and target_audience):
-        st.error("Please fill in all the fields.")
+    if not startup_name or not description:
+        st.warning("Please fill in all required fields.")
     else:
         with st.spinner("Generating hype content..."):
-            messages = [
-                {"role": "system", "content": "You are a creative startup content generator."},
-                {"role": "user", "content": generate_prompt(startup_name, description, target_audience, content_type, tone)}
-            ]
-            outputs = []
-            for _ in range(variations):
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=messages,
-                    temperature=0.7,
-                )
-                outputs.append(response.choices[0].message.content.strip())
+            for i in range(num_variations):
+                prompt = f"Create a {tone.lower()} {content_type.lower()} for a startup called {startup_name}. It is {description}. Target audience: {audience}.\n"
 
-        st.success("Here you go!")
-        for i, out in enumerate(outputs, 1):
-            st.markdown(f"### 🔹 Variation {i}")
-            st.write(out)
+                output = generator(prompt, max_length=100, num_return_sequences=1)[0]["generated_text"]
+
+                st.subheader(f"Variation {i + 1}")
+                st.write(output.strip())
